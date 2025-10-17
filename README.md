@@ -51,17 +51,19 @@ Postman Observer is a Go-based security tool that continuously monitors Postman'
 
 ## ✨ Features
 
-- 🔎 **Keyword-Based Monitoring** - Search for your organization's keywords in public Postman collections
+- 🔎 **Intelligent Keyword Search** - Uses Postman's native search API to find ANY public collection mentioning your keywords (company names, domains, product names, etc.)
+- 🌐 **Dual Search Strategy** - Combines Postman API + Web scraping to find collections from ANY user
 - 🚨 **Secret Detection** - Identify 20+ types of exposed credentials (AWS keys, GitHub tokens, JWT, API keys, etc.)
+- 🎯 **Smart Deduplication** - Shows unique secrets with occurrence count instead of listing duplicates (e.g., "137 unique secrets (716 total occurrences)")
 - ✅ **Active Verification** - Test if detected secrets are still valid (GitHub, Slack, Stripe, etc.)
-- 🔄 **Duplicate Detection** - Find identical secrets across multiple collections
+- 🔄 **Cross-Collection Duplicate Detection** - Find identical secrets exposed across multiple collections
 - 👤 **User Filtering** - Automatically excludes your own collections from monitoring
-- 📊 **Multiple Report Formats** - Generate JSON, HTML (dark theme), and Markdown reports
+- 📊 **Multiple Report Formats** - Generate JSON, HTML (dark theme), and Markdown reports with occurrence tracking
 - 📧 **Email Alerts** - Optional email notifications (Gmail, AWS SES, SendGrid, etc.)
 - ⏱️ **Rate Limiting** - Built-in API throttling to respect Postman's rate limits
 - 🔗 **Clickable Links** - Direct links to collections in all reports
 - 🌙 **Dark Theme Reports** - Professional GitHub-style dark theme for HTML reports
-- 📝 **Detailed Logging** - Timestamped log files for every run
+- 📝 **Detailed Logging** - Timestamped log files for every run with occurrence statistics
 - ⚙️ **Flexible Configuration** - Support for .env, YAML, or environment variables
 
 ---
@@ -358,6 +360,130 @@ crontab -e
 
 ## 🔍 Features in Detail
 
+### Keyword Scanning - How It Works
+
+The tool uses **flexible keyword matching** to find public Postman collections from ANY user. You don't need exact collection names - just provide keywords related to your organization.
+
+#### **Two-Stage Search Process:**
+
+**Stage 1: Postman API Search**
+```
+Uses: /collections?q=keyword
+Finds: Collections you have access to (yours + shared)
+Speed: Fast but limited
+```
+
+**Stage 2: Web Scraping (Postman's Native API)**
+```
+Uses: https://www.postman.com/_api/ws/proxy
+Finds: ALL public collections from ANY user
+Method: Same API the Postman website uses
+Searches:
+  - Collection names and descriptions
+  - Workspace names
+  - Request names inside collections
+  - API documentation
+  - Collection metadata
+```
+
+#### **What Keywords Can You Use?**
+
+You can use **ANY keywords**, not just collection names:
+
+✅ **Company/Organization Names:**
+```bash
+MONITOR_KEYWORDS=YourCompany,Google,Microsoft,Acme Corp
+```
+
+✅ **Domain Names:**
+```bash
+MONITOR_KEYWORDS=yourcompany.com,api.yourcompany.com,internal.company.net
+```
+
+✅ **Product/Service Names:**
+```bash
+MONITOR_KEYWORDS=YourProduct,YourService-API,InternalPlatform
+```
+
+✅ **Internal Project Codes:**
+```bash
+MONITOR_KEYWORDS=PROJECT-ALPHA,INTERNAL-API,PROD-ENV-2024
+```
+
+✅ **Technology Stack Identifiers:**
+```bash
+MONITOR_KEYWORDS=your-api-key-prefix,your-jwt-issuer,custom-header
+```
+
+#### **Real-World Example:**
+
+When you search for keyword `"Monotype"`:
+
+```bash
+2025/10/17 10:19:18 🔎 Searching for keyword: Monotype
+2025/10/17 10:19:18    API search: Found 1 accessible collections
+2025/10/17 10:19:19    Web scraping: Found 1 public collections
+2025/10/17 10:19:19    Total unique collections: 2
+2025/10/17 10:19:19    ⏭️  Skipping your own collection: Monotype - Online Dashboard
+2025/10/17 10:19:20    🔬 Deep scanning collection: Monotype API
+2025/10/17 10:19:20    🚨 CRITICAL: PUBLIC collection with 3 unique secret(s) (6 total occurrences)
+```
+
+The tool found a collection named "Monotype API" created by another user that contains exposed secrets!
+
+#### **Best Practices:**
+
+1. **Be Specific:** Use unique company identifiers
+   - ❌ Bad: `connect` (too generic, many false positives)
+   - ✅ Good: `yourcompany-connect` (specific to your organization)
+
+2. **Use Multiple Keywords:** Cover different aspects
+   ```bash
+   YourCompany,yourcompany.com,YourProduct,YourService-API
+   ```
+
+3. **Include Domain Variations:**
+   ```bash
+   company.com,api.company.com,internal.company.com
+   ```
+
+4. **Add Internal Codes:** Project names, environment identifiers
+   ```bash
+   PROJ-2024,PROD-ENV,INTERNAL-API-V2
+   ```
+
+### Smart Deduplication
+
+The tool intelligently handles duplicate secrets:
+
+**Before (Old Behavior):**
+```
+Found 716 secrets:
+1. Heroku API Key: abc-123 (Location: Header)
+2. Heroku API Key: abc-123 (Location: Body)
+3. Heroku API Key: abc-123 (Location: URL)
+... (713 more lines)
+```
+
+**After (New Behavior):**
+```
+🚨 CRITICAL: 137 unique secret(s) (716 total occurrences)
+
+Secret: Heroku API Key
+Value: abc-123
+Occurrences: 3 location(s)
+Locations:
+  - Request > Header
+  - Request > Body
+  - Request > URL
+```
+
+**Benefits:**
+- 📊 Clear visibility: See unique secrets vs total occurrences
+- 📍 Location tracking: Know exactly where each secret appears
+- 📈 Better reporting: "137 unique secrets (716 occurrences)" vs "716 secrets"
+- 🎯 Easier remediation: Focus on unique secrets, not duplicates
+
 ### Secret Detection
 
 Detects **20+ types** of secrets using regex patterns:
@@ -417,42 +543,74 @@ sequenceDiagram
 - ✅ SendGrid API Keys
 - ✅ JWT Token Validation (decode + expiry check)
 
-### Duplicate Detection
+### Cross-Collection Duplicate Detection
 
-Finds identical secrets across multiple collections:
+The tool tracks identical secrets that appear across multiple collections, helping identify:
+- Shared credentials being reused
+- Copy-pasted collection templates
+- Leaked secrets spreading across teams
+
+**Example Output:**
 
 ```bash
-⚠️  Found 127 duplicate secret(s) across multiple collections!
+⚠️  Found 4 duplicate secret(s) across multiple collections!
 
 Example:
-Secret: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtp...
-Found in:
-  - Test-Online
-  - Testing Platform
-  - API Testing Collection
+Secret: sk_live_51HxY8zKmG3TdQp7X...
+Type: Stripe Secret Key
+Found in 3 collections:
+  - Production API Tests (Owner: team-member-1)
+  - Staging Environment (Owner: team-member-2)
+  - Customer Support Tools (Owner: team-member-3)
+
+Status: 🚨 CRITICAL - Same production key exposed in 3 different collections!
 ```
+
+**Report Includes:**
+- Secret value (full, unredacted)
+- Secret type
+- List of all collections containing it
+- Owner of each collection
+- Risk assessment
 
 ### Report Generation
 
-Generates **three report formats** simultaneously:
+Generates **three report formats** simultaneously with smart deduplication:
 
 #### 1. **JSON Report** (`findings_YYYY-MM-DD_HH-MM-SSPM.json`)
 - Machine-readable format
-- Complete data structure
-- Easy to parse with tools
+- Complete data structure with `occurrences` and `locations` fields
+- Easy to parse with automation tools
+- Example structure:
+  ```json
+  {
+    "type": "Heroku API Key",
+    "value": "abc-123...",
+    "occurrences": 5,
+    "locations": [
+      "Request > Header",
+      "Request > Body",
+      "Collection JSON"
+    ]
+  }
+  ```
 
 #### 2. **HTML Report** (`findings_YYYY-MM-DD_HH-MM-SSPM.html`)
 - Dark theme (GitHub-style)
-- Interactive tables
-- Clickable links
-- Shows ALL secrets (no truncation)
+- Interactive tables with occurrence badges
+- Shows "Found in X locations" instead of duplicates
+- Expandable location lists
+- Clickable links to collections
+- Shows ALL unique secrets (no truncation)
 - Responsive design
 
 #### 3. **Markdown Report** (`findings_YYYY-MM-DD_HH-MM-SSPM.md`)
 - Human-readable format
-- Collapsible secret sections
-- Duplicate detection table
+- Table with "Occurrences" column
+- Collapsible "📍 Click to view all locations" sections
+- Cross-collection duplicate detection table
 - Easy to view in GitHub/GitLab
+- Perfect for security incident tickets
 
 ### User Filtering
 

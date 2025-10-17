@@ -16,11 +16,13 @@ type SecretPattern struct {
 
 // SecretMatch represents a found secret
 type SecretMatch struct {
-	Type         string              // e.g., "AWS Access Key", "JWT Token"
-	Value        string              // The matched value (partially redacted)
-	RawValue     string              // The full unredacted value (for verification only)
-	Location     string              // Where it was found (header, body, url, etc.)
-	FullPath     string              // Full path in collection (folder/request/field)
+	Type         string   // e.g., "AWS Access Key", "JWT Token"
+	Value        string   // The matched value (partially redacted)
+	RawValue     string   // The full unredacted value (for verification only)
+	Location     string   // Where it was found (header, body, url, etc.)
+	FullPath     string   // Full path in collection (folder/request/field)
+	Locations    []string // All locations where this secret was found
+	Occurrences  int      // Number of times this secret was found
 	Description  string
 	Verification *VerificationResult // Result of verification (if performed)
 }
@@ -339,17 +341,31 @@ func (s *SecretScanner) redactSecret(secret string) string {
 	return start + middle + end
 }
 
-// deduplicateMatches removes duplicate secret matches
+// deduplicateMatches removes duplicate secret matches and counts occurrences
+// Groups secrets by Type + RawValue and tracks all locations
 func (s *SecretScanner) deduplicateMatches(matches []SecretMatch) []SecretMatch {
-	seen := make(map[string]bool)
-	var unique []SecretMatch
+	// Map key: Type:RawValue
+	secretMap := make(map[string]*SecretMatch)
 
 	for _, match := range matches {
-		key := fmt.Sprintf("%s:%s:%s", match.Type, match.Value, match.Location)
-		if !seen[key] {
-			seen[key] = true
-			unique = append(unique, match)
+		key := fmt.Sprintf("%s:%s", match.Type, match.RawValue)
+
+		if existing, exists := secretMap[key]; exists {
+			// Secret already found - add location and increment count
+			existing.Locations = append(existing.Locations, match.Location)
+			existing.Occurrences++
+		} else {
+			// First occurrence of this secret
+			match.Locations = []string{match.Location}
+			match.Occurrences = 1
+			secretMap[key] = &match
 		}
+	}
+
+	// Convert map back to slice
+	var unique []SecretMatch
+	for _, match := range secretMap {
+		unique = append(unique, *match)
 	}
 
 	return unique

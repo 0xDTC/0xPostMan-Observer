@@ -5,8 +5,14 @@ postman-observer
 *.so
 *.dylib
 
-# Test binary
+# Test binary and test files
 *.test
+test-*.sh
+*.mitm
+.env.test
+
+# Temporary files
+COMMIT_MESSAGE.txt
 
 # Output of go coverage tool
 *.out

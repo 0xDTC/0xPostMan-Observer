@@ -13,32 +13,34 @@ import (
 
 // Finding represents a complete finding report
 type Finding struct {
-	ObservedLink       string          `json:"observed_link"`
-	CollectionURL      string          `json:"collection_url"`
-	CollectionAPIURL   string          `json:"collection_api_url"`
-	CollectionID       string          `json:"collection_id"`
-	Name               string          `json:"name"`
-	Owner              string          `json:"owner"`
-	Description        string          `json:"description"`
-	IsPublic           bool            `json:"is_public"`
-	Keyword            string          `json:"keyword"`
-	SuggestedIgnore    string          `json:"suggested_ignore_keyword"`
-	Secrets            []SecretDetail  `json:"secrets"`
-	SecretCount        int             `json:"secret_count"`
-	Timestamp          string          `json:"timestamp"`
+	ObservedLink     string         `json:"observed_link"`
+	CollectionURL    string         `json:"collection_url"`
+	CollectionAPIURL string         `json:"collection_api_url"`
+	CollectionID     string         `json:"collection_id"`
+	Name             string         `json:"name"`
+	Owner            string         `json:"owner"`
+	Description      string         `json:"description"`
+	IsPublic         bool           `json:"is_public"`
+	Keyword          string         `json:"keyword"`
+	SuggestedIgnore  string         `json:"suggested_ignore_keyword"`
+	Secrets          []SecretDetail `json:"secrets"`
+	SecretCount      int            `json:"secret_count"`
+	Timestamp        string         `json:"timestamp"`
 }
 
 // SecretDetail represents detailed secret information
 type SecretDetail struct {
-	Type         string `json:"type"`
-	Value        string `json:"value"`           // Full unmasked value
-	Location     string `json:"location"`
-	FullPath     string `json:"full_path"`
-	Description  string `json:"description"`
-	IsVerified   bool   `json:"is_verified"`
-	IsValid      bool   `json:"is_valid"`
-	RateLimited  bool   `json:"rate_limited"`
-	VerifyMsg    string `json:"verify_message,omitempty"`
+	Type        string   `json:"type"`
+	Value       string   `json:"value"`       // Full unmasked value
+	Location    string   `json:"location"`    // Primary location (kept for backwards compatibility)
+	Locations   []string `json:"locations"`   // All locations where this secret was found
+	Occurrences int      `json:"occurrences"` // Number of times found
+	FullPath    string   `json:"full_path"`
+	Description string   `json:"description"`
+	IsVerified  bool     `json:"is_verified"`
+	IsValid     bool     `json:"is_valid"`
+	RateLimited bool     `json:"rate_limited"`
+	VerifyMsg   string   `json:"verify_message,omitempty"`
 }
 
 // Report represents the complete report structure
@@ -137,7 +139,9 @@ func (r *Reporter) GenerateReport(alerts []notifier.Alert) (string, error) {
 			detail := SecretDetail{
 				Type:        secret.Type,
 				Value:       secret.RawValue, // Use full unmasked value
-				Location:    secret.Location,
+				Location:    secret.Location, // Primary location for backwards compatibility
+				Locations:   secret.Locations,
+				Occurrences: secret.Occurrences,
 				FullPath:    secret.FullPath,
 				Description: secret.Description,
 			}
@@ -187,7 +191,9 @@ func ConvertSecretsToDetails(secrets []scanner.SecretMatch) []SecretDetail {
 		detail := SecretDetail{
 			Type:        secret.Type,
 			Value:       secret.RawValue, // Use full unmasked value
-			Location:    secret.Location,
+			Location:    secret.Location, // Primary location for backwards compatibility
+			Locations:   secret.Locations,
+			Occurrences: secret.Occurrences,
 			FullPath:    secret.FullPath,
 			Description: secret.Description,
 		}

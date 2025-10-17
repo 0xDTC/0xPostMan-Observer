@@ -38,7 +38,7 @@ func (r *Reporter) GenerateMarkdownReport(alerts []notifier.Alert, duplicates ma
 	var md strings.Builder
 
 	// Header
-	md.WriteString(fmt.Sprintf("# 🔍 Postman Observer Security Report\n\n"))
+	md.WriteString("# 🔍 Postman Observer Security Report\n\n")
 	md.WriteString(fmt.Sprintf("**Generated:** %s\n\n", time.Now().Format("Monday, January 2, 2006 at 03:04:05 PM MST")))
 
 	md.WriteString("---\n\n")
@@ -90,8 +90,8 @@ func (r *Reporter) GenerateMarkdownReport(alerts []notifier.Alert, duplicates ma
 		// Secrets Details
 		if len(alert.Secrets) > 0 {
 			md.WriteString("#### 🔐 Exposed Secrets\n\n")
-			md.WriteString("| # | Type | Value | Location | Status |\n")
-			md.WriteString("|---|------|-------|----------|--------|\n")
+			md.WriteString("| # | Type | Value | Occurrences | Status |\n")
+			md.WriteString("|---|------|-------|-------------|--------|\n")
 
 			for j, secret := range alert.Secrets {
 				verification := "-"
@@ -103,7 +103,7 @@ func (r *Reporter) GenerateMarkdownReport(alerts []notifier.Alert, duplicates ma
 					}
 				}
 
-				// Check for duplicates
+				// Check for duplicates across collections
 				duplicateNote := ""
 				if dups, exists := duplicates[secret.RawValue]; exists && len(dups) > 1 {
 					duplicateNote = fmt.Sprintf(" ⚠️ **[Duplicate in %d collections]**", len(dups))
@@ -114,16 +114,33 @@ func (r *Reporter) GenerateMarkdownReport(alerts []notifier.Alert, duplicates ma
 					truncatedValue = truncatedValue[:80] + "..."
 				}
 
+				// Build occurrences info
+				occurrencesInfo := fmt.Sprintf("%d location(s)", secret.Occurrences)
+
 				md.WriteString(fmt.Sprintf("| %d | **%s** | `%s`%s | %s | %s |\n",
 					j+1,
 					escapeMarkdown(secret.Type),
 					escapeMarkdown(truncatedValue),
 					duplicateNote,
-					escapeMarkdown(secret.Location),
+					occurrencesInfo,
 					verification,
 				))
 			}
 			md.WriteString("\n")
+
+			// Add detailed locations section
+			if len(alert.Secrets) > 0 {
+				md.WriteString("<details>\n")
+				md.WriteString("<summary>📍 Click to view all locations</summary>\n\n")
+				for j, secret := range alert.Secrets {
+					md.WriteString(fmt.Sprintf("\n**%d. %s**\n", j+1, escapeMarkdown(secret.Type)))
+					md.WriteString(fmt.Sprintf("- Found in %d location(s):\n", secret.Occurrences))
+					for _, loc := range secret.Locations {
+						md.WriteString(fmt.Sprintf("  - %s\n", escapeMarkdown(loc)))
+					}
+				}
+				md.WriteString("\n</details>\n\n")
+			}
 
 			// Full secret values (collapsed section)
 			md.WriteString("<details>\n")

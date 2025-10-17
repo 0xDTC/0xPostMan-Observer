@@ -15,28 +15,30 @@ import (
 
 // Monitor orchestrates the monitoring process
 type Monitor struct {
-	config          *config.Config
-	client          *postman.Client
-	notifier        *notifier.EmailNotifier
-	reporter        *reporter.Reporter
-	secretScanner   *scanner.SecretScanner
-	secretVerifier  *scanner.SecretVerifier
-	seenAlerts      map[string]time.Time // Track already alerted collections
-	dryRun          bool                 // If true, don't send emails
-	currentUserID   string               // Current user's ID to filter own collections
+	config         *config.Config
+	client         *postman.Client
+	webScraper     *postman.WebScraper
+	notifier       *notifier.EmailNotifier
+	reporter       *reporter.Reporter
+	secretScanner  *scanner.SecretScanner
+	secretVerifier *scanner.SecretVerifier
+	seenAlerts     map[string]time.Time // Track already alerted collections
+	dryRun         bool                 // If true, don't send emails
+	currentUserID  string               // Current user's ID to filter own collections
 }
 
 // NewMonitor creates a new monitor instance
 func NewMonitor(cfg *config.Config) *Monitor {
 	return &Monitor{
-		config:          cfg,
-		client:          postman.NewClient(cfg.PostmanAPIKey),
-		notifier:        notifier.NewEmailNotifier(cfg.Email),
-		reporter:        reporter.NewReporter("reports"),
-		secretScanner:   scanner.NewSecretScanner(),
-		secretVerifier:  scanner.NewSecretVerifier(),
-		seenAlerts:      make(map[string]time.Time),
-		dryRun:          false,
+		config:         cfg,
+		client:         postman.NewClient(cfg.PostmanAPIKey),
+		webScraper:     postman.NewWebScraper(),
+		notifier:       notifier.NewEmailNotifier(cfg.Email),
+		reporter:       reporter.NewReporter("reports"),
+		secretScanner:  scanner.NewSecretScanner(),
+		secretVerifier: scanner.NewSecretVerifier(),
+		seenAlerts:     make(map[string]time.Time),
+		dryRun:         false,
 	}
 }
 
@@ -100,13 +102,56 @@ func (m *Monitor) runCheck() error {
 	for _, keyword := range m.config.MonitorKeywords {
 		log.Printf("🔎 Searching for keyword: %s", keyword)
 
-		collections, err := m.client.SearchCollectionsByQuery(keyword)
+		// First, search via API (limited to accessible collections)
+		apiCollections, err := m.client.SearchCollectionsByQuery(keyword)
 		if err != nil {
-			log.Printf("⚠️  Error searching for '%s': %v", keyword, err)
-			continue
+			log.Printf("⚠️  API search error for '%s': %v", keyword, err)
+		} else {
+			log.Printf("   API search: Found %d accessible collections", len(apiCollections))
 		}
 
-		log.Printf("   Found %d collections", len(collections))
+		// Then, search via web scraping (finds ALL public collections)
+		log.Printf("   🌐 Web scraping Postman public search...")
+		scrapedCollections, err := m.webScraper.SearchPublicCollections(keyword)
+		if err != nil {
+			log.Printf("⚠️  Web scraping error for '%s': %v", keyword, err)
+		} else {
+			log.Printf("   Web scraping: Found %d public collections", len(scrapedCollections))
+		}
+
+		// Convert scraped collections to standard format
+		var collections []postman.Collection
+
+		// Add API collections first
+		if apiCollections != nil {
+			collections = append(collections, apiCollections...)
+		}
+
+		// Add scraped collections (convert format)
+		seenURLs := make(map[string]bool)
+		for _, col := range collections {
+			seenURLs[col.ID] = true
+		}
+
+		for _, scraped := range scrapedCollections {
+			// Skip if already found via API
+			collectionID := m.webScraper.GetCollectionID(scraped.URL)
+			if seenURLs[collectionID] {
+				continue
+			}
+
+			// Convert scraped collection to standard Collection format
+			collections = append(collections, postman.Collection{
+				ID:          collectionID,
+				Name:        scraped.Name,
+				Description: scraped.Description,
+				IsPublic:    true,
+				Owner:       scraped.Username, // This will be different from current user
+				UID:         scraped.URL,
+			})
+		}
+
+		log.Printf("   Total unique collections: %d", len(collections))
 
 		// Filter and check each collection
 		for _, col := range collections {
@@ -181,7 +226,12 @@ func (m *Monitor) runCheck() error {
 
 			// Log with explicit public exposure warning
 			if len(secrets) > 0 {
-				log.Printf("   🚨 CRITICAL: PUBLIC collection with %d EXPOSED SECRET(S) - %s (ID: %s)", len(secrets), col.Name, col.ID)
+				// Count total occurrences across all unique secrets
+				totalOccurrences := 0
+				for _, s := range secrets {
+					totalOccurrences += s.Occurrences
+				}
+				log.Printf("   🚨 CRITICAL: PUBLIC collection with %d unique secret(s) (%d total occurrences) - %s (ID: %s)", len(secrets), totalOccurrences, col.Name, col.ID)
 			} else {
 				log.Printf("   ⚠️  WARNING: PUBLIC collection found (no secrets detected) - %s (ID: %s)", col.Name, col.ID)
 			}

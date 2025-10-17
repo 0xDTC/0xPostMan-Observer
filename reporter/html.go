@@ -290,7 +290,7 @@ func (r *Reporter) GenerateHTMLReport(alerts []notifier.Alert, duplicates map[st
 		if len(alert.Secrets) > 0 {
 			html.WriteString(`<ul class="secret-list">`)
 
-			// Show ALL secrets (no limit)
+			// Show unique secrets with occurrence count
 			for j := 0; j < len(alert.Secrets); j++ {
 				secret := alert.Secrets[j]
 				verificationIcon := ""
@@ -302,23 +302,40 @@ func (r *Reporter) GenerateHTMLReport(alerts []notifier.Alert, duplicates map[st
 					}
 				}
 
-				// Check if duplicate
+				// Check if duplicate across collections
 				duplicateMsg := ""
 				if dups, exists := duplicates[secret.RawValue]; exists && len(dups) > 1 {
 					duplicateMsg = fmt.Sprintf(`<div class="duplicate-warning">⚠️ <strong>Duplicate secret</strong> found in %d collections</div>`, len(dups))
 				}
 
+				// Show occurrence count within this collection
+				occurrenceMsg := ""
+				if secret.Occurrences > 1 {
+					occurrenceMsg = fmt.Sprintf(` <span class="badge badge-info">Found in %d locations</span>`, secret.Occurrences)
+				}
+
+				// Build locations list
+				locationsHTML := ""
+				if len(secret.Locations) > 0 {
+					locationsHTML = "<small style='color: #7f8c8d;'>Locations:<br>"
+					for _, loc := range secret.Locations {
+						locationsHTML += fmt.Sprintf("• %s<br>", gohtml.EscapeString(loc))
+					}
+					locationsHTML += "</small>"
+				}
+
 				html.WriteString(fmt.Sprintf(`
                             <li class="secret-item">
-                                <span class="secret-type">%s</span>%s<br>
+                                <span class="secret-type">%s</span>%s%s<br>
                                 <span class="secret-value">%s</span><br>
-                                <small style="color: #7f8c8d;">Location: %s</small>
+                                %s
                                 %s
                             </li>`,
 					gohtml.EscapeString(secret.Type),
 					verificationIcon,
+					occurrenceMsg,
 					gohtml.EscapeString(secret.RawValue),
-					gohtml.EscapeString(secret.Location),
+					locationsHTML,
 					duplicateMsg,
 				))
 			}

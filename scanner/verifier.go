@@ -68,7 +68,7 @@ func (v *SecretVerifier) VerifySecret(secret SecretMatch) *VerificationResult {
 }
 
 // verifyAWS checks if AWS credentials are valid
-func (v *SecretVerifier) verifyAWS(ctx context.Context, accessKey string) *VerificationResult {
+func (v *SecretVerifier) verifyAWS(ctx context.Context, _ string) *VerificationResult {
 	// AWS STS GetCallerIdentity - most basic AWS API call
 	// Note: This requires the secret key as well, which we might not have
 	// So we do a simpler check - try to use it and see if we get authentication errors
@@ -307,7 +307,7 @@ func (v *SecretVerifier) verifySendGrid(ctx context.Context, apiKey string) *Ver
 }
 
 // verifyJWT analyzes JWT structure (doesn't validate signature)
-func (v *SecretVerifier) verifyJWT(ctx context.Context, token string) *VerificationResult {
+func (v *SecretVerifier) verifyJWT(_ context.Context, token string) *VerificationResult {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return &VerificationResult{

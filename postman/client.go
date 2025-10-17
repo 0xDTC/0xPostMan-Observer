@@ -16,8 +16,8 @@ const (
 
 // Client represents a Postman API client
 type Client struct {
-	apiKey     string
-	httpClient *http.Client
+	apiKey      string
+	httpClient  *http.Client
 	rateLimiter *time.Ticker
 }
 
@@ -37,9 +37,9 @@ type Collection struct {
 // SearchResponse represents the response from search API
 type SearchResponse struct {
 	Data []struct {
-		Score      float64 `json:"score"`
+		Score      float64    `json:"score"`
 		Document   Collection `json:"document"`
-		EntityType string `json:"entityType"`
+		EntityType string     `json:"entityType"`
 	} `json:"data"`
 	Meta struct {
 		Total int `json:"total"`
@@ -157,7 +157,7 @@ func (c *Client) SearchPublicCollections(keyword string) ([]Collection, error) {
 
 	for _, col := range result.Collections {
 		if strings.Contains(strings.ToLower(col.Name), keyword) ||
-		   strings.Contains(strings.ToLower(col.Description), keyword) {
+			strings.Contains(strings.ToLower(col.Description), keyword) {
 			filtered = append(filtered, col)
 		}
 	}

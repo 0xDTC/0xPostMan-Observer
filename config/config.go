@@ -19,8 +19,8 @@ type Config struct {
 
 // DeepScanConfig holds deep scanning settings
 type DeepScanConfig struct {
-	Enabled        bool `yaml:"enabled"`
-	VerifySecrets  bool `yaml:"verify_secrets"`
+	Enabled       bool `yaml:"enabled"`
+	VerifySecrets bool `yaml:"verify_secrets"`
 }
 
 // EmailConfig holds email notification settings
