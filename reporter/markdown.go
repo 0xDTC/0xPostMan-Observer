@@ -83,8 +83,16 @@ func (r *Reporter) GenerateMarkdownReport(alerts []notifier.Alert, duplicates ma
 
 		// Links
 		md.WriteString("**🔗 Quick Links:**\n")
-		md.WriteString(fmt.Sprintf("- [View Collection](https://www.postman.com/collection/%s)\n", alert.Collection.ID))
-		md.WriteString(fmt.Sprintf("- [Web Interface](https://www.postman.com/%s)\n", alert.Collection.ID))
+
+		// Build proper URLs with workspace info
+		if alert.Collection.Owner != "" && alert.Collection.Workspace != "" {
+			md.WriteString(fmt.Sprintf("- [View Collection](https://www.postman.com/%s/%s/collection/%s)\n",
+				alert.Collection.Owner, alert.Collection.Workspace, alert.Collection.ID))
+			md.WriteString(fmt.Sprintf("- [Workspace Overview](https://www.postman.com/%s/%s/overview)\n",
+				alert.Collection.Owner, alert.Collection.Workspace))
+		} else {
+			md.WriteString(fmt.Sprintf("- [View Collection](https://www.postman.com/collection/%s)\n", alert.Collection.ID))
+		}
 		md.WriteString(fmt.Sprintf("- [API Endpoint](https://api.getpostman.com/collections/%s)\n\n", alert.Collection.ID))
 
 		// Secrets Details

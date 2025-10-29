@@ -15,6 +15,7 @@ import (
 type Finding struct {
 	ObservedLink     string         `json:"observed_link"`
 	CollectionURL    string         `json:"collection_url"`
+	WorkspaceURL     string         `json:"workspace_url"`      // Workspace overview URL
 	CollectionAPIURL string         `json:"collection_api_url"`
 	CollectionID     string         `json:"collection_id"`
 	Name             string         `json:"name"`
@@ -111,9 +112,23 @@ func (r *Reporter) GenerateReport(alerts []notifier.Alert) (string, error) {
 
 	totalSecrets := 0
 	for _, alert := range alerts {
+		// Build proper collection URL with username and workspace
+		var collectionURL, workspaceURL string
+		if alert.Collection.Owner != "" && alert.Collection.Workspace != "" {
+			collectionURL = fmt.Sprintf("https://www.postman.com/%s/%s/collection/%s",
+				alert.Collection.Owner, alert.Collection.Workspace, alert.Collection.ID)
+			workspaceURL = fmt.Sprintf("https://www.postman.com/%s/%s/overview",
+				alert.Collection.Owner, alert.Collection.Workspace)
+		} else {
+			// Fallback if workspace is not available
+			collectionURL = fmt.Sprintf("https://www.postman.com/collection/%s", alert.Collection.ID)
+			workspaceURL = ""
+		}
+
 		finding := Finding{
-			ObservedLink:     fmt.Sprintf("https://www.postman.com/collection/%s", alert.Collection.ID),
-			CollectionURL:    fmt.Sprintf("https://www.postman.com/%s", alert.Collection.ID),
+			ObservedLink:     collectionURL,
+			CollectionURL:    collectionURL,
+			WorkspaceURL:     workspaceURL,
 			CollectionAPIURL: fmt.Sprintf("https://api.getpostman.com/collections/%s", alert.Collection.ID),
 			CollectionID:     alert.Collection.ID,
 			Name:             alert.Collection.Name,

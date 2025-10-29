@@ -79,10 +79,21 @@ func (m *Monitor) Start() {
 
 // RunOnce runs a single check and exits
 func (m *Monitor) RunOnce() error {
+	// Check if API key is provided
+	if m.config.PostmanAPIKey == "" {
+		log.Println("ℹ️  Running in PUBLIC SCAN mode (no API key provided)")
+		log.Println("   📋 Will scan public collections found via web search")
+		log.Println("   ⚠️  Cannot filter your own collections (no user ID)")
+		log.Println("   ⚠️  Some collections may fail to download if they require authentication")
+		log.Println("")
+	}
+
 	// Get current user ID to filter own collections
 	userID, err := m.client.GetCurrentUser()
 	if err != nil {
-		log.Printf("⚠️  Warning: Could not get current user info: %v", err)
+		if m.config.PostmanAPIKey != "" {
+			log.Printf("⚠️  Warning: Could not get current user info: %v", err)
+		}
 		log.Println("   Continuing without user filtering (may include your own collections)")
 	} else {
 		m.currentUserID = userID
@@ -147,6 +158,7 @@ func (m *Monitor) runCheck() error {
 				Description: scraped.Description,
 				IsPublic:    true,
 				Owner:       scraped.Username, // This will be different from current user
+				Workspace:   scraped.Workspace,
 				UID:         scraped.URL,
 			})
 		}

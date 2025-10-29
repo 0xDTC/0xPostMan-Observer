@@ -132,7 +132,7 @@ func (ws *WebScraper) SearchPublicCollections(keyword string) ([]ScrapedCollecti
 		collectionID, _ := doc["id"].(string)
 
 		// Try to extract owner/workspace info from various possible fields
-		var username, workspace, workspaceSlug string
+		var username, workspaceSlug string
 
 		// Get publisher handle (username)
 		if publisherHandle, ok := doc["publisherHandle"].(string); ok {
@@ -142,9 +142,6 @@ func (ws *WebScraper) SearchPublicCollections(keyword string) ([]ScrapedCollecti
 		// Try to get workspace from the workspaces array
 		if workspaces, ok := doc["workspaces"].([]interface{}); ok && len(workspaces) > 0 {
 			if ws, ok := workspaces[0].(map[string]interface{}); ok {
-				if wsName, ok := ws["name"].(string); ok {
-					workspace = wsName
-				}
 				if slug, ok := ws["slug"].(string); ok {
 					workspaceSlug = slug
 				}
@@ -176,7 +173,7 @@ func (ws *WebScraper) SearchPublicCollections(keyword string) ([]ScrapedCollecti
 			Description: description,
 			URL:         collectionURL,
 			Username:    username,
-			Workspace:   workspace,
+			Workspace:   workspaceSlug, // Use slug, not name, for URL construction
 		})
 	}
 

@@ -45,6 +45,7 @@ Postman Observer is a Go-based security tool that continuously monitors Postman'
 - [API Limitations](#-api-limitations)
 - [Security Considerations](#-security-considerations)
 - [Contributing](#-contributing)
+- [Changelog](#-changelog)
 - [License](#-license)
 
 ---
@@ -221,8 +222,8 @@ classDiagram
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/postman-observer.git
-cd postman-observer
+git clone https://github.com/0xDTC/0xPostMan-Observer.git
+cd 0xPostMan-Observer
 
 # Build the binary
 go build -o postman-observer .
@@ -822,6 +823,34 @@ API request failed with status 429: Too Many Requests
    - Postman enforces rate limits on API calls
    - Tool includes automatic throttling (500ms between calls)
 
+4. **Collection JSON Limitations**
+
+   **What IS Included in Collection JSON:**
+   - ✅ Collection name, description, ID
+   - ✅ All requests (HTTP method, URL, headers, body)
+   - ✅ Request names and folder structure
+   - ✅ Query parameters and path variables
+   - ✅ Authentication settings (Auth tokens, API keys)
+   - ✅ Pre-request and test scripts
+   - ✅ Example responses (if saved)
+   - ✅ Collection variables
+   - ✅ Request/response metadata
+
+   **What Is NOT Included:**
+   - ❌ Full API documentation/descriptions (may be truncated or missing)
+   - ❌ Detailed comments on individual parameters
+   - ❌ Rich text formatting from documentation
+   - ❌ Images/screenshots embedded in documentation
+   - ❌ Workspace-level settings and permissions
+   - ❌ Collection activity logs or edit history
+   - ❌ User comments and collaboration notes
+   - ❌ Some UI-specific metadata
+
+   **Impact on This Tool:**
+   - The tool searches for **keywords in URLs, request names, headers, bodies, and scripts**
+   - Full API documentation may not be searchable via the API
+   - For complete verification, manually review collections on Postman's website
+
 ---
 
 ## 🔐 Security Considerations
@@ -872,6 +901,53 @@ Contributions are welcome! Please follow these guidelines:
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+---
+
+## 📝 Changelog
+
+### Version 1.1.0 (Latest)
+
+**🎯 Smart Deduplication**
+- Added intelligent secret deduplication with occurrence tracking
+- Shows "X unique secrets (Y total occurrences)" instead of listing duplicates
+- Reports now include all locations where each unique secret appears
+- Improved report clarity and reduced noise
+
+**🔍 Enhanced Keyword Search**
+- Improved fuzzy keyword matching through Postman's native search API
+- Better discovery of public collections from any user
+- Fixed workspace slug extraction for proper URL construction
+- Generated URLs now match format: `https://www.postman.com/username/workspace/collection/id`
+
+**🐛 Bug Fixes**
+- Fixed unused parameter warnings in `scanner/verifier.go`
+- Fixed unnecessary `fmt.Sprintf` usage in `reporter/markdown.go`
+- Fixed broken collection URLs with proper workspace support
+- Improved error handling for optional API key scenarios
+
+**📊 Report Improvements**
+- All report formats (JSON, HTML, Markdown) now show occurrence counts
+- HTML reports display occurrence badges: "Found in X locations"
+- Markdown reports include collapsible location details
+- Better cross-collection duplicate detection
+
+**📚 Documentation**
+- Added comprehensive API limitations section
+- Documented what IS and ISN'T included in Postman collection JSON
+- Fixed GitHub clone URL
+- Enhanced troubleshooting section
+
+### Version 1.0.0
+
+**Initial Release**
+- Secret detection for 20+ credential types
+- Active secret verification (GitHub, Slack, Stripe, etc.)
+- Cross-collection duplicate detection
+- Multiple report formats (JSON, HTML, Markdown)
+- Email alerts with SMTP support
+- User filtering to exclude own collections
+- Rate limiting and API throttling
 
 ---
 

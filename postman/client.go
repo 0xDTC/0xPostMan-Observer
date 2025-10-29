@@ -28,6 +28,7 @@ type Collection struct {
 	Description string `json:"description"`
 	IsPublic    bool   `json:"isPublic"`
 	Owner       string `json:"owner"`
+	Workspace   string `json:"workspace"` // Workspace slug for URL construction
 	UID         string `json:"uid"`
 	Fork        struct {
 		Label string `json:"label"`
@@ -71,6 +72,11 @@ func NewClient(apiKey string) *Client {
 
 // GetCurrentUser retrieves the authenticated user's information
 func (c *Client) GetCurrentUser() (string, error) {
+	// Skip if no API key provided
+	if c.apiKey == "" {
+		return "", fmt.Errorf("no API key provided - user filtering disabled")
+	}
+
 	c.waitForRateLimit()
 
 	endpoint := fmt.Sprintf("%s/me", baseURL)
@@ -258,13 +264,21 @@ func (c *Client) GetCollectionAsMap(collectionID string) (map[string]interface{}
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-API-Key", c.apiKey)
+	// Only set API key if one is provided
+	if c.apiKey != "" {
+		req.Header.Set("X-API-Key", c.apiKey)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	// If 401 and no API key, try public API endpoint
+	if resp.StatusCode == http.StatusUnauthorized && c.apiKey == "" {
+		return c.getPublicCollection(collectionID)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -274,6 +288,38 @@ func (c *Client) GetCollectionAsMap(collectionID string) (map[string]interface{}
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
+}
+
+// getPublicCollection attempts to fetch a public collection without authentication
+func (c *Client) getPublicCollection(collectionID string) (map[string]interface{}, error) {
+	// Try Postman's public API endpoint (no auth required for public collections)
+	publicEndpoint := fmt.Sprintf("https://www.postman.com/_api/collection/%s", collectionID)
+
+	req, err := http.NewRequest("GET", publicEndpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create public request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("public request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("public API failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode public response: %w", err)
 	}
 
 	return result, nil

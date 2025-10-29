@@ -254,6 +254,19 @@ func (r *Reporter) GenerateHTMLReport(alerts []notifier.Alert, duplicates map[st
 			owner = gohtml.EscapeString(alert.Collection.Owner)
 		}
 
+		// Build proper URLs with workspace info
+		var collectionURL, workspaceURL string
+		if alert.Collection.Owner != "" && alert.Collection.Workspace != "" {
+			collectionURL = fmt.Sprintf("https://www.postman.com/%s/%s/collection/%s",
+				alert.Collection.Owner, alert.Collection.Workspace, alert.Collection.ID)
+			workspaceURL = fmt.Sprintf("https://www.postman.com/%s/%s/overview",
+				alert.Collection.Owner, alert.Collection.Workspace)
+		} else {
+			collectionURL = fmt.Sprintf("https://www.postman.com/collection/%s", alert.Collection.ID)
+			workspaceURL = ""
+		}
+		apiURL := fmt.Sprintf("https://api.getpostman.com/collections/%s", alert.Collection.ID)
+
 		html.WriteString(fmt.Sprintf(`
                 <tr>
                     <td><strong>%d</strong></td>
@@ -263,8 +276,22 @@ func (r *Reporter) GenerateHTMLReport(alerts []notifier.Alert, duplicates map[st
                         <div class="owner-info">Keyword: <strong>%s</strong></div>
                         <div class="owner-info">Suggested Ignore: <code>%s</code></div>
                         <div class="links" style="margin-top: 8px;">
-                            <a href="%s" target="_blank">🔗 View</a>
-                            <a href="%s" target="_blank">📋 Web</a>
+                            <a href="%s" target="_blank">🔗 View Collection</a>`,
+			i+1,
+			gohtml.EscapeString(alert.Collection.Name),
+			gohtml.EscapeString(alert.Collection.ID),
+			gohtml.EscapeString(alert.Keyword),
+			gohtml.EscapeString(alert.Collection.Name),
+			collectionURL,
+		))
+
+		// Add workspace overview link if available
+		if workspaceURL != "" {
+			html.WriteString(fmt.Sprintf(`
+                            <a href="%s" target="_blank">📋 Workspace</a>`, workspaceURL))
+		}
+
+		html.WriteString(fmt.Sprintf(`
                             <a href="%s" target="_blank">🔌 API</a>
                         </div>
                     </td>
@@ -272,14 +299,7 @@ func (r *Reporter) GenerateHTMLReport(alerts []notifier.Alert, duplicates map[st
                     <td><span class="badge %s">%s</span></td>
                     <td><span class="badge badge-danger">%d</span></td>
                     <td>`,
-			i+1,
-			gohtml.EscapeString(alert.Collection.Name),
-			gohtml.EscapeString(alert.Collection.ID),
-			gohtml.EscapeString(alert.Keyword),
-			gohtml.EscapeString(alert.Collection.Name),
-			fmt.Sprintf("https://www.postman.com/collection/%s", alert.Collection.ID),
-			fmt.Sprintf("https://www.postman.com/%s", alert.Collection.ID),
-			fmt.Sprintf("https://api.getpostman.com/collections/%s", alert.Collection.ID),
+			apiURL,
 			owner,
 			severityBadge,
 			severity,

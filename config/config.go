@@ -58,8 +58,10 @@ func LoadConfig(path string) (*Config, error) {
 
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
-	if c.PostmanAPIKey == "" || c.PostmanAPIKey == "YOUR_POSTMAN_API_KEY" {
-		return fmt.Errorf("postman_api_key is required")
+	// API key is now optional - warn if not provided
+	if c.PostmanAPIKey == "" || c.PostmanAPIKey == "YOUR_POSTMAN_API_KEY" || c.PostmanAPIKey == "PMAK-your-api-key-here" {
+		c.PostmanAPIKey = "" // Clear placeholder values
+		// Don't return error - just continue without API key (limited functionality)
 	}
 
 	// Email is optional - only validate if SMTP host is provided
